@@ -1,0 +1,453 @@
+---
+title: "Spotify Data Analysis"
+subtitle: "Stat041 Final Project"
+author: "JJ Balisanyuka-Smith"
+runtime: shiny
+output: html_document
+css: bootstrap.css
+fontsize: 12pt
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(httr)
+library(ggplot2)
+library(ggthemes)
+library(ggridges)
+library(tidymodels)
+library(plotly)
+library(timetk)
+library(prettydoc)
+library(thematic)
+library(bslib)
+library(shinythemes)
+library(gganimate)
+```
+
+```{r load-data, echo=FALSE, warning = FALSE, message = FALSE}
+#kaggle data
+Full_Spotify <- read_csv("data.csv")
+
+Decades <- c("1920s", "1930s", "1940s", "1950s", "1960s", "1970s", "1980s", "1990s", "2000s", "2010s", "2020s")
+
+theme_final <- theme_hc()
+```
+# Introduction {.tabset} 
+## Introduction
+
+This paper is about how what counts as popular music has changed immensely over time. This is due to many changes in how music has changed deeply both qualitatively and quantitatively over time. The primary source for the data that I am using is from the music streaming service spotify. In recent years Spotify, Soundcloud and Apple Music have worked to consolidate much of the influence that other music sharing platforms used to have. We are in a golden age of data for and about music partially due to these platforms and Spotify via it’s api is one of the best data sources for this. Spotify Assume that they predict what future musical trends will be and we will use simple linear regression to address that Assumption
+
+The primary dataset I will be looking at is the Spotify Kaggle Dataset from 1921 to 2020. It contains over 170,000 entries which will be explained in more detail below. Over those 100 years of music the culture changed significantly. The most popular Song in 1920 was Swanee by Al Jonson, a strong lover of wearing black face, in fact the so-called "the king of blackface". Meanwhile some of the most popular song of 2019 was a fuse of Country and Hiphop by a 19 year old gay black man and a teenage girl and her brother in their childhood bedrooms. Music has dramatically changed in the past century and I hope to show how some of the ways this has happened as well as some of the influences.
+
+So the biggest question of this paper is what has influenced popularity over time. What stays constant? What changes over time? I guess a bigger question is, are some of these variables able to be projected into the future? And finally how has music changed in society over the last 100 years and how has society changed music in the last 100 years.
+ 
+## Methods
+
+I'm going about answering this question by firstly looking at the Most Popular Artists and Songs of the last decade. These help to elucidate what the trends are being set. It is not necessarily the best way to analyze trends as famous artists may be the only person who has those particular characteristics. A perfect would an artist like Eminimen who Might Suggest White Rappers From the Midwest are extremely popular or Old Town road, which was the shortest number hit in over 30 years. By looking at rough trends like these.
+I will then look at a bunch of Audio Characteristics. These fundamentally come down to the music's instrumentality, the emotions that it makes you feel, such as Danceability and the general Valence. I Separately look at song durations. I then turn to questions that I have looked at before, which is how explicit music has changed over the years. I finish my analysis with an in-depth analysis of how music has changed over the decades using density plots; broken down by Popularity, Loudness, Tempo, and Explicitness, shown by a bar chart. Finally, I created a linear Model to elucidate what best predicts the popularity over time.
+
+## The Data
+
+### This is Data Description (Edited from source description for Clarity and Conciseness). There are 19 Variables and there should be no need to read the entire description.
+
+* Accousticness: A confidence measure from 0.0 to 1.0 of whether the track is acoustic. 1.0 represents high confidence the track is acoustic. This is done by a machine learning algorithm, and especially for more recent music, may not be as accurate.
+
+* Energy: Energy is a measure from 0.0 to 1.0 and represents a perceptual measure of intensity and activity. Typically, energetic tracks feel fast, loud, and noisy. This is again subjective, and Spotify doesn't give much information about how they derive this.
+
+* Valence: A measure from 0.0 to 1.0 describing the musical positiveness of the track. Tracks with high valence sound more positive (e.g., happy, cheerful, euphoric), while tracks with low valence sound more negative (e.g., sad, depressed, angry)
+
+* Instrumentalness: Predicts whether a track contains no vocals. "Ooh" and "aah" sounds are treated as instrumental in this context. Rap or spoken word tracks are clearly "vocal." The closer the instrumentalness value is to 1.0, the greater likelihood the track contains no vocal content. Values above 0.5 are intended to represent instrumental tracks, but confidence is higher as the value approaches 1.0.
+
+* Key: The Key the track is in. Integers map to pitches using standard Pitch Class notation. There are 12 key centers, and this states how much larger the Key is than C.
+
+* Liveness: Detects the presence of an audience in the recording. Higher liveness values represent an increased probability that the track was performed live. A value above 0.8 provides a strong likelihood that the song is live.
+
+* Loudness: The overall loudness of a track in decibels (dB). Loudness values are averaged across the entire track and are useful for comparing the relative loudness of tracks. Loudness is the quality of a sound that is the primary psychological correlate of physical strength (amplitude)—values typically range between -60 and 0 dB. Loudness is a logarithmic scale.
+
+* Mode: Mode indicates the modality (major or minor) of a track, the type of scale from which its melodic content is derived. Major is represented by 1, and minor is 0. -1 occurs in the rare time's when it is not actually minor.
+
+* Speechiness: Speechiness detects the presence of spoken words in a track. The more exclusively speech-like the recording (e.g., talk show, audiobook, poetry), the closer to 1.0 the attribute value. Values between 0.33 and 0.66 describe tracks that may contain both music and speech, either in sections or layered, including such cases as rap music.
+
+* Artist: This shows who the person who is making the music is. It is a vector containing all the musicians who are noted as artists. One thing to note is that producers and engineers are not listed in this data set, and neither is ghost artists. There are some notable people in music history, such as Quincy Jones, who rarely are listed as a named artist on records yet contributed to some of the most popular records on this list, such as Micheal jackson's thriller.
+
+* Tempo: This is how many beats the song has on average per minute.
+
+* Release date: This is the year and, for later releases, the exact day that songs were released. The most recent release date is the 24th of November 2020.
+Popularity and Year: Displays the Peak position on the Billboard 200 and the year it happened. This is not a perfect representation of the popularity of music, and this will be further addressed in the methods section of the paper. This is due to the algorithm used to create the ratings significantly changing over the past 100 Years and often for reasons that were seen as unobjective.
+
+* Popularity; The popularity of the album. The value will be between 0 and 100, with 100 being the most popular. The popularity is calculated from the popularity of the album’s individual tracks. W
+
+\n\n
+
+```{r, echo=FALSE, warning = FALSE, message = FALSE}
+  shinyApp(
+    ui = fluidPage(
+      fluidRow(
+        column(3,
+          dataTableOutput('table')
+        )
+      )
+    ),
+    server = function(input, output) {
+      output$table <- renderDataTable(Full_Spotify)
+    },
+    options = list(height = 2000)
+  )
+```
+
+# Graphs {.tabset} 
+
+## Most Popular Artists and Songs
+
+These graphs shows the most popular artists and songs over the last 100 years. You can subset along year periods  view those periods. While this used to based upon the billboard 100 they seem to have divereged.
+
+
+```{r Artist, echo=FALSE, warning = FALSE, message = FALSE}
+shinyApp(
+
+  ui = fluidPage(
+    
+numericInput(
+  inputId =  "Start", 
+  label = "Select the start of the time period:",
+  value = 1920,
+  min = 1920, max = 2020, step = 1),
+numericInput(
+  inputId =  "End", 
+  label = "Select the end of the time period:",
+  value = 2020,
+  min = 1920, max = 2020, step = 1),
+plotOutput(outputId = "bar")
+  ),
+
+  server = function(input, output) {
+  output$bar <- renderPlot({
+    
+  if(input$Start < input$End){
+    
+  p3 <- Full_Spotify %>% filter(year >= input$Start & year <= input$End)
+  
+  } else {
+  p3 <- Full_Spotify %>% filter(year == input$Start)
+}
+ 
+p3 %>%
+group_by(artists) %>% 
+summarize(Count = n()) %>%
+arrange(desc(Count)) %>%
+top_n(10) %>%
+ggplot(aes(x = reorder(artists,desc(Count)), y = Count, fill = artists)) +
+  geom_bar(stat = "identity", alpha = .3) + 
+  theme_final +
+  scale_color_hc()+
+  scale_fill_hc() +
+  theme(legend.position = "none") +
+theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+labs(title = "Top contributing artists with the count of total songs",x = " Artists",y = "")
+
+  })
+  },
+
+  options = list(height = 500)
+)
+```
+
+```{r Top 10 Songs, echo=FALSE, warning = FALSE, message = FALSE}
+shinyApp(
+ui = fluidPage(
+
+numericInput(
+  inputId =  "Start", 
+  label = "Select the start of the time period:",
+  value = 1920,
+  min = 1920, max = 2020, step = 1),
+numericInput(
+  inputId =  "End", 
+  label = "Select the end of the time period:",
+  value = 2020,
+  min = 1920, max = 2020, step = 1),
+plotOutput(outputId = "bar")
+  ),
+
+  server = function(input, output) {
+  output$bar <- renderPlot({
+    
+  if(input$Start < input$End){
+    
+  p1 <- Full_Spotify %>% filter(year >= input$Start & year <= input$End)
+  
+  } else {
+  p1 <- Full_Spotify %>% filter(year == input$Start)
+}
+ 
+p1 %>%
+group_by(name) %>%  
+summarize(Popularity = mean(popularity))  %>% arrange(Popularity) %>% top_n(10) %>%
+ggplot(aes(x = reorder(name,desc(Popularity)), y = Popularity, fill = name)) +
+  geom_bar(stat = "identity", alpha = .3) +
+  theme_final +
+  scale_color_hc()+
+  scale_fill_hc() +
+  theme(legend.position = "none") +
+theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+labs(title = "Top 10 Songs",x = NULL,y = "Popularity")
+  })
+  },
+
+  options = list(height = 500)
+)
+```
+
+## Audio Characteristics
+
+This graph is dynamic and shows how different Audio Charescterisitics change over time. They are highly dependent on the machine learning models that produced them, yet they are very informative. Especially Acoustic!
+
+```{r Audio Characteristics, echo=FALSE, warning = FALSE, message = FALSE}
+shinyApp(
+
+  ui = fluidPage(
+      selectInput("variable", "Variables to show:",
+                     c("Energy" = "energy", "Acoustic" = "acousticness","Speechiness" = "speechiness","Liveness" = "liveness","Valence" = "valence", "Danceability" = "danceability", "Instrumentalness" = "instrumentalness"), multiple = TRUE, selected = "instrumentalness"),
+      plotOutput(outputId = "line")
+  ),
+
+  server = function(input, output) {
+  output$line <- renderPlot({
+  if (c("acousticness") %in% input$variable | c("energy") %in% input$variable | c("speechiness") %in% input$variable | c("liveness") %in% input$variable | c("valence") %in% input$variable | c("danceability") %in% input$variable | c("instrumentalness") %in% input$variable ){
+  p1 <-  Full_Spotify %>% 
+  group_by(year) %>%
+  summarize(energy = mean(energy), acousticness = mean(acousticness),speechiness = mean(speechiness),
+            liveness = mean(liveness), valence = mean(valence), danceability = mean(danceability), instrumentalness = mean(instrumentalness)) %>%
+  ggplot(aes(x = year))
+  
+  #Checking for each line
+  if("acousticness" %in% input$variable){
+  p1 <- p1 + geom_smooth(method = "gam", se = FALSE, aes(y = acousticness, col = "Acousticness"))
+  }
+  if("energy" %in% input$variable){
+  p1 <- p1 + geom_smooth(method = "gam", se = FALSE, aes(y = energy , col = "Energy"))
+  }
+  if("speechiness" %in% input$variable){
+  p1 <- p1 + geom_smooth(method = "gam", se = FALSE, aes(y = speechiness, col = "Speechiness"))
+  }
+  if("liveness" %in% input$variable){
+  p1 <- p1 + geom_smooth(method = "gam", se = FALSE, aes(y = liveness, col = "Liveness"))
+  }
+  if("valence" %in% input$variable){
+  p1 <- p1 + geom_smooth(method = "gam", se = FALSE, aes(y = valence, col = "Valence"))
+  }
+  if("danceability" %in% input$variable){
+  p1 <- p1 + geom_smooth(method = "gam", se = FALSE, aes(y = danceability, col = "Danceability"))
+  }
+  if("instrumentalness" %in% input$variable){
+  p1 <- p1 + geom_smooth(method = "gam", se = FALSE, aes(y = instrumentalness, col = "Instrumentalness"))
+  }
+  
+  p1 + theme_hc()+
+  scale_colour_hc(name = "Audio Characteristics") +
+  labs(title = "Behaviour of the audio characteristics over the years",x = "Year", y = "Measure")
+    }})
+  },
+
+  options = list(height = 500)
+)
+```
+
+## Song Durations
+
+This graph shows song duration. It also opens up at a gif version that shows the evolution over time.
+
+```{r Song Duration, echo=FALSE, warning = FALSE, message = FALSE}
+
+shinyApp(
+
+  ui = fluidPage(
+      checkboxInput(inputId = "Dynamic", label ="Moving Graph", value = FALSE),
+      plotOutput(outputId = "line")
+  ),
+
+  server = function(input, output) {
+  output$line <- renderPlot({
+  top2000 <- Full_Spotify %>% slice_min(order_by = popularity, prop = 0.1) %>% group_by(year) %>%
+summarize(Duration = mean(duration_ms) / 1000)
+
+bottom2000 <- Full_Spotify %>% slice_max(order_by = popularity, prop = 0.1)  %>% group_by(year) %>%
+summarize(Duration = mean(duration_ms) / 1000)
+
+main <- Full_Spotify %>% group_by(year) %>%
+  summarize(Duration = mean(duration_ms) / 1000) %>%
+  ggplot(aes(x = year, y = Duration )) + 
+  geom_smooth(se = FALSE, aes(col = "Middle 10%")) +
+  geom_smooth(data = top2000, se = FALSE,  aes(x = year, y = Duration, col = "top10%")) +
+  geom_smooth(data = bottom2000, se = FALSE, aes(x = year, y = Duration, col = "bottom10%")) +
+  theme_final +
+  scale_color_hc()+
+  scale_fill_hc() +
+  labs(title = "Duration of song over the years",x = "Year", y = "Duration (Seconds)")
+
+  #Checking for each line
+  if(input$Dynamic == TRUE){
+    
+  anim_1 = main +
+  transition_reveal(year)
+
+  animate(anim_1, nframes = 10, fps=4)} 
+else {
+    main
+  }
+  
+    })
+  },
+
+  options = list(height = 500)
+)
+
+```
+
+## By The Decades (Scroll to see graphs)
+
+
+These are primiraly density plots for:
+*Popularity
+*Loudness
+*Tempo
+*Explicit
+They are all variables that are shown well over time.
+
+```{r Popularity By Decade, echo=FALSE, warning = FALSE, message = FALSE}
+shinyApp(
+
+  ui = fluidPage(
+      checkboxInput(inputId = "Popularity", label ="Popularity", value = TRUE),
+      checkboxInput(inputId = "Loudness", label = "Loudness", value = TRUE),
+      checkboxInput(inputId = "Tempo", label ="Tempo", value = TRUE),
+      checkboxInput(inputId = "Explicit", label ="Explicit", value = TRUE),
+      
+      plotOutput(outputId = "Popularity"),
+      plotOutput(outputId = "Loudness"),
+      plotOutput(outputId = "Tempo"),
+      plotOutput(outputId = "Explicit")
+  ),
+
+  server = function(input, output) {
+output$Popularity <- renderPlot({
+if( input$Popularity == TRUE ){
+Full_Spotify %>%
+mutate(Decade = cut_interval(year, n = 10)) %>%
+group_by(Decade) %>%
+ggplot(aes(y = Decade, x = liveness, fill = Decade))+
+  geom_density_ridges(alpha = .3)+
+labs(title = "Popularity by decade", x = "", y = "")+
+  theme_final +
+  scale_color_hc()+
+  scale_fill_hc() +
+  scale_y_discrete(labels= Decades)+
+  theme(legend.position = "none")
+
+}  })
+output$Loudness <- renderPlot({
+if( input$Loudness == TRUE ){  
+Full_Spotify %>%
+mutate(Decade = cut_interval(year, n = 10)) %>%
+group_by(Decade) %>%
+ggplot(aes(y = Decade, x = loudness, fill = Decade))+
+  geom_density_ridges(alpha = .3)+
+labs(title = "Loudness by decade", x = "", y = "")+
+  theme_final +
+  scale_color_hc()+
+  scale_fill_hc() +
+  scale_y_discrete(labels= Decades)+
+  theme(legend.position = "none")
+ } })
+output$Tempo <- renderPlot({
+if( input$Tempo == TRUE ){
+  Full_Spotify %>%
+mutate(Decade = cut_interval(year, n = 10)) %>%
+group_by(Decade) %>%
+ggplot(aes(y = Decade, x = tempo, fill = Decade))+
+  geom_density_ridges(alpha = .3)+
+labs(title = "Tempo by decade", x = "", y = "")+
+  theme_final +
+  scale_color_hc()+
+  scale_fill_hc() +
+  scale_y_discrete(labels= Decades)+
+  theme(legend.position = "none")
+}
+})
+output$Explicit <- renderPlot({
+if( input$Explicit == TRUE ){
+  Full_Spotify %>%
+mutate(Decade = cut_interval(year, n = 10)) %>%
+group_by(Decade) %>%
+  summarize(Explicit = mean(explicit)) %>%
+ggplot(aes(x = Decade, y = Explicit, fill = Decade))+
+  geom_bar(stat = "identity", alpha = .3)+
+labs(title = "% Explicit Songs by decade", x = "", y = "")+
+  theme_final +
+  scale_color_hc()+
+  scale_fill_hc() +
+  theme(legend.position = "none")+
+  scale_x_discrete(labels= Decades)
+}
+})
+  },
+    options = list(height = 1800)
+)
+```
+
+## Explicit Songs
+
+```{r Explicit Songs Yearly, echo=FALSE, warning = FALSE, message = FALSE}
+Full_Spotify %>%
+  group_by(year) %>%
+summarize(Count = mean(explicit)) %>%
+ggplot(aes(x = year, y = Count)) + 
+  geom_line(alpha = .5)+
+  geom_vline(xintercept = 1989, linetype="dotted") +
+  geom_smooth(method = "gam", se = FALSE, alpha = 0.5) + 
+  theme_final +
+  scale_color_hc()+
+  scale_fill_hc() +
+  annotate("text", x=1995, y=0.45, label= "Internet\nInvented\nIn 1989", fontface = "bold", fontsize = 12) +
+  labs(title = "How explicit are songs over the years",x = "Years", y = "% of Songs that are explicit")
+```
+
+# Final Model 
+
+
+Finally, this is the Final Model. I have popularity being predicted by year interacting with energy loudness and valence Independently. This Gives a Final Model of:
+
+Popularity = -1722 + 0.88 Year +569 Energy - 11 Loudness - 44.6 Valence - 0.28 Energy X Year + 0.006 Year X Loudness + 0.23 Year X Valence
+
+```{r lm model, echo=FALSE, warning = FALSE, message = FALSE}
+mod1 <- lm(popularity ~ year * (energy + loudness + valence) ,Full_Spotify)
+model <- lm(popularity ~ year ,Full_Spotify)
+summary(model)
+#tidy(model)
+#anova(mod1, model2)
+library(knitr)
+kable(tidy(mod1))
+```
+
+# Discussion
+
+The Year a song was released was able to predict 73% of the Variance in the model. This shouldn't necessarily be true as there are only 200 spots for each week, and there are 52 weeks in the Year. There, however, could be a few reasons for this that would require a different set. Most of the current most popular songs are from recent years, and as the dataset is from Spotify, it may just be that they did not have access to those songs. This would be especially relevant for low ranking songs from earlier years or songs by bands where there may be so many rights holders that it becomes increasingly difficult to have them legally be available. This further skews the results as these least popular songs may have different characteristics; this especially makes me worried about the speechiness characteristic as auditory-only music is becoming more popular now. There is little explanation of where this data came from and spotify has 50 million songs and this is a very small subset of those songs. It is also an extremly US Centric and it would be intrested how these variables also differ geographically. Eminem for example is extremely popular in the midwest and this should be looked into in more depth.
+
+It is also interesting that the duration of songs has dramatically changed over the years. It shows how songs have been slowly increasing over time till the 80s. It is intriguing that when CDs were introduced coincides with the fall of the duration of songs. This is showing that the availability of cheap music that people can control leads to a decline in song length. This is further supported by the fact that the beginning of the streaming era. This is due to the fact that songs count as streams if they are played for 30 seconds. This obviously can't continue forever; however, with songs like old town road being the longest-charting number 1 song ever clocking in at 1:53, we are sure to find out in the coming years how short a hit single really can be. There is a complication brought in by the fact that the very most popular songs; they have massively increased in length over the past 30 years. I can not see a simple explanation for this.
+
+In A 
+
+The people who are the most popular artists have changed considerably over the time of the dataset. The Artists who are the most popular artists in the first 20 years of the dataset were primarily tango musicians and Jazz singers like Francisco Canaro and Billie Holiday. Whereas right now, the most popular artists of the past 20 are from a very large range of genres. Taylor Swift is a Country singer, Eminem is a rapper, BTS is a K.Pop Group, and Drake does a whole bunch of Genres. It is interesting to note that most of these genres did not exist 100 years ago. Jazz started to gain popularity in the late 1910s popularity, and its derivative genres have now come to dominate the music. Even country music didn't exist in 1920, showing how much music has changed. On the other hand, it is strongly noticeable that one artist has been the most popular artist of both the 2010s and earlier 2000s, and the big question may be can Taylor Swift Continue her reign of supremacy. There is an artist who has an extraordinary gap between their first and last number 1's (23 years), Frank Sinatra. This may be why Frank Sinatra has ranked among the most popular artists of the decade like other great artists such as Bob Dylan. The fact that the most popular Songs are heavily from the last six months suggests that there may be overweighting. What it does show, however, is that the most popular songs of the moment are generally recent releases.
+
+There seems to be a wide increase in the amount of vulgar language used in music since the establishment of the internet. One of the other big influences may have been the rise of rap music. Over a third of Swearing has happened in the last decade, and I think platforms like Spotify may be part of the reason for this. In order to get popular in music, you would have to radio play in the past; however, being able to be streamed means artists can release explicit only singles and chart as they don’t have to worry about the fcc’s swearing rules. This is definitely something that should be compared to other countries.
+
+Music has really iterated a lot throughout the decades. There seems to be an even distribution of popular songs over decades. On the other hand, the loudness of songs has increased a lot over the past 100 years. The Variance has decreased a lot too, with the overwhelming weight being very close to 0 in the last ten years and basically no songs being below -15db, which is where the majority of songs were before 1980. As music is Logarithmic with 3db roughly equaling a doubling of loudness, this means that music today is literally 32 times louder than music from before the 80s. This may partially help to explain why a lot of older music is being remastered in order to compete with new music in the so-called "Loudness Wars."
+
+The many music characteristics oscillate over time. One really sticks out. Music used to be overwhelmingly acoustic, and now it is less than 25% acoustic. This is due to the rise of electronic music production; however, the interesting question might be why it was so high to start with. This might suggest that the algorithm used to decide whether something is acoustic or not maybe perfect as early music had no real choice whether or not to be acoustic. Similar criteria are probably due to the smaller drop in instrumentalness. There has been much less orchestral music as the Latin bands that dominate the beginning of the dataset are not as popular, and it appears electronic music doesn’t fully replace classical sonatas in their ability to entertain the listener without vocals. Energy has constantly been going up between the 1950 and ’80s showing the rise of funk and rock lead to much more energy in music. On the other hand, it is shocking that liveness is below 20% for the whole dataset. This shows that people overwhelmingly prefer professional recordings no matter the era.
+
+In Conclusion, this dataset was far from perfect. It was amazing however to look into some of the details behind how music has changed over time. There have been some really interesting trends in music. It is shocking how common some artists are in this dataset and how the names you would expect would come up.  There also seems to be a dramatic change in every era of music but the last 20 years have had big changes. From the rapid increase in bad language to a true plurality of popular genres. The face of popular music has changed a great deal in the past 100 years and if current trends continue, they will change alot in the next 100 years.
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
